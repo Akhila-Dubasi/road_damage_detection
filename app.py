@@ -1,16 +1,17 @@
 import streamlit as st
 import numpy as np
-import cv2
 from PIL import Image
-import joblib
 import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.express as px
 
 # ================= PAGE CONFIG =================
 
 st.set_page_config(
     page_title="Road Damage Detection",
     page_icon="🚧",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="collapsed"
 )
 
 # ================= CUSTOM CSS =================
@@ -18,46 +19,91 @@ st.set_page_config(
 st.markdown("""
 <style>
 
-/* Main Background */
-.stApp {
-    background: linear-gradient(135deg, #0b1120, #111827, #1e293b);
-    color: white;
-    font-family: 'Segoe UI', sans-serif;
+/* Import Font */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Poppins', sans-serif;
 }
 
-/* Main Heading */
-.main-title {
+/* Main Background */
+.stApp {
+    background:
+        radial-gradient(circle at top left, #1e3a8a 0%, transparent 25%),
+        radial-gradient(circle at bottom right, #0f766e 0%, transparent 25%),
+        linear-gradient(135deg, #020617, #0f172a, #111827);
+
+    color: white;
+}
+
+/* Hide Streamlit Menu */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+
+/* Hero Section */
+.hero {
+    padding: 40px 20px;
+    border-radius: 28px;
     text-align: center;
-    font-size: 52px;
+
+    background: rgba(255,255,255,0.05);
+
+    backdrop-filter: blur(20px);
+
+    border: 1px solid rgba(255,255,255,0.08);
+
+    box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+
+    margin-bottom: 30px;
+}
+
+/* Main Title */
+.main-title {
+    font-size: 62px;
     font-weight: 800;
-    color: #f8fafc;
-    margin-top: 10px;
-    letter-spacing: 1px;
+
+    background: linear-gradient(
+        to right,
+        #38bdf8,
+        #818cf8,
+        #06b6d4
+    );
+
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+
+    margin-bottom: 10px;
 }
 
 /* Subtitle */
 .sub-title {
-    text-align: center;
-    font-size: 20px;
+    font-size: 22px;
     color: #cbd5e1;
-    margin-bottom: 35px;
+    font-weight: 400;
 }
 
-/* Glass Effect Container */
-.section-box {
-    background: rgba(255, 255, 255, 0.06);
+/* Section Cards */
+.glass-card {
+    background: rgba(255,255,255,0.05);
+
+    border: 1px solid rgba(255,255,255,0.08);
+
     backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
 
-    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 24px;
 
-    padding: 28px;
-    border-radius: 22px;
+    padding: 30px;
 
     margin-bottom: 25px;
 
-    box-shadow:
-        0 8px 32px rgba(0,0,0,0.35);
+    box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+
+    transition: 0.3s ease;
+}
+
+.glass-card:hover {
+    transform: translateY(-3px);
 }
 
 /* Titles */
@@ -65,70 +111,82 @@ st.markdown("""
     font-size: 30px;
     font-weight: 700;
     color: #38bdf8;
-    margin-bottom: 18px;
+    margin-bottom: 20px;
 }
 
-/* Normal Text */
+/* Paragraph */
 .normal-text {
-    font-size: 18px;
     color: #e2e8f0;
-    line-height: 1.9;
+    line-height: 2;
+    font-size: 18px;
 }
 
 /* Upload Box */
 [data-testid="stFileUploader"] {
+    border-radius: 22px;
+    padding: 20px;
+    border: 2px dashed #38bdf8;
     background: rgba(255,255,255,0.04);
-    border-radius: 18px;
-    padding: 15px;
-    border: 1px dashed #38bdf8;
 }
 
-/* Prediction Box */
-.prediction-box {
-    background: linear-gradient(
-        135deg,
-        rgba(16,185,129,0.25),
-        rgba(5,150,105,0.35)
-    );
+/* Prediction Card */
+.prediction-card {
+    border-radius: 25px;
 
-    border: 1px solid rgba(16,185,129,0.4);
-
-    padding: 25px;
-    border-radius: 20px;
+    padding: 35px;
 
     text-align: center;
 
-    margin-top: 20px;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(14,165,233,0.18),
+            rgba(59,130,246,0.15)
+        );
 
-    box-shadow: 0px 4px 18px rgba(0,0,0,0.3);
-}
+    border: 1px solid rgba(59,130,246,0.3);
 
-/* Recommendation Box */
-.recommend-box {
-    background: linear-gradient(
-        135deg,
-        rgba(239,68,68,0.18),
-        rgba(127,29,29,0.35)
-    );
-
-    border: 1px solid rgba(239,68,68,0.3);
-
-    padding: 24px;
-    border-radius: 20px;
+    box-shadow: 0 8px 35px rgba(0,0,0,0.35);
 
     margin-top: 20px;
-
-    box-shadow: 0px 4px 18px rgba(0,0,0,0.3);
 }
 
-/* Graph Styling */
-canvas {
-    border-radius: 15px !important;
+/* Recommendation Card */
+.recommend-card {
+    border-radius: 25px;
+
+    padding: 30px;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(239,68,68,0.15),
+            rgba(127,29,29,0.20)
+        );
+
+    border: 1px solid rgba(239,68,68,0.2);
+
+    box-shadow: 0 8px 35px rgba(0,0,0,0.35);
+
+    margin-top: 25px;
 }
 
-/* Image Styling */
+/* Metrics */
+.metric {
+    font-size: 20px;
+    color: #e2e8f0;
+    margin-top: 12px;
+}
+
+.metric-big {
+    font-size: 42px;
+    font-weight: 700;
+    color: white;
+}
+
+/* Image */
 img {
-    border-radius: 18px;
+    border-radius: 24px;
 }
 
 /* Scrollbar */
@@ -141,87 +199,87 @@ img {
     border-radius: 10px;
 }
 
-::-webkit-scrollbar-track {
-    background: #0f172a;
-}
-
-/* Buttons */
-.stButton>button {
+/* Button */
+.stButton > button {
     background: linear-gradient(to right, #0ea5e9, #2563eb);
+
     color: white;
+
     border: none;
-    padding: 10px 24px;
-    border-radius: 12px;
+
+    border-radius: 14px;
+
+    padding: 12px 28px;
+
+    font-size: 16px;
+
     font-weight: 600;
+
     transition: 0.3s;
 }
 
-.stButton>button:hover {
+.stButton > button:hover {
     transform: scale(1.03);
-    background: linear-gradient(to right, #0284c7, #1d4ed8);
 }
 
-/* Metric Style */
-h2, h3 {
-    color: #f8fafc;
+/* Success Animation */
+@keyframes pulse {
+    0% {transform: scale(1);}
+    50% {transform: scale(1.02);}
+    100% {transform: scale(1);}
+}
+
+.prediction-card {
+    animation: pulse 2s infinite;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
-# ================= HEADER =================
+# ================= HERO SECTION =================
 
-st.markdown(
-    """
-    <div class='main-title'>
-    🚧 AI-Based Road Damage Detection System
+st.markdown("""
+<div class="hero">
+
+    <div class="main-title">
+        🚧 Road Damage Detection AI
     </div>
-    """,
-    unsafe_allow_html=True
-)
 
-st.markdown(
-    """
-    <div class='sub-title'>
-    Smart City Infrastructure Monitoring using CNN
+    <div class="sub-title">
+        Smart Infrastructure Monitoring using Deep Learning & Computer Vision
     </div>
-    """,
-    unsafe_allow_html=True
-)
 
-# ================= ABOUT PROJECT =================
+</div>
+""", unsafe_allow_html=True)
 
-st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+# ================= ABOUT SECTION =================
 
-st.markdown(
-    "<div class='section-title'>📌 About the Project</div>",
-    unsafe_allow_html=True
-)
+st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 
 st.markdown(
-    """
-    <div class='normal-text'>
-
-    • Road monitoring is important to prevent accidents and improve public safety.<br><br>
-
-    • Damaged roads like potholes and cracks can increase vehicle damage and traffic risks.<br><br>
-
-    • Convolutional Neural Networks (CNNs) help computers analyze and classify road surface images automatically.<br><br>
-
-    • AI-based monitoring systems are widely used in smart cities, transportation systems, autonomous vehicles, and infrastructure maintenance.
-
-    </div>
-    """,
+    '<div class="section-title">📌 About This Project</div>',
     unsafe_allow_html=True
 )
 
-st.markdown("</div>", unsafe_allow_html=True)
+st.markdown("""
+<div class="normal-text">
+
+✅ Detects potholes, cracks, and manholes automatically using AI.<br><br>
+
+✅ Helps smart cities monitor road conditions efficiently.<br><br>
+
+✅ Reduces accidents and infrastructure maintenance delays.<br><br>
+
+✅ Uses Convolutional Neural Networks (CNNs) for image classification.<br><br>
+
+✅ Can be integrated with drones, CCTV systems, and autonomous vehicles.
+
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= MODEL =================
-
-# Replace this with your trained model later
-# Example:
-# model = joblib.load("road_damage_model.pkl")
 
 classes = [
     "Crack",
@@ -229,21 +287,27 @@ classes = [
     "Pothole"
 ]
 
-# ================= IMAGE UPLOAD =================
+# ================= LAYOUT =================
 
-st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+left, right = st.columns([1, 1])
 
-st.markdown(
-    "<div class='section-title'>📤 Upload Road Image</div>",
-    unsafe_allow_html=True
-)
+# ================= UPLOAD SECTION =================
 
-uploaded_file = st.file_uploader(
-    "Choose an image...",
-    type=["jpg", "jpeg", "png"]
-)
+with left:
 
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="section-title">📤 Upload Road Image</div>',
+        unsafe_allow_html=True
+    )
+
+    uploaded_file = st.file_uploader(
+        "Upload an image",
+        type=["jpg", "jpeg", "png"]
+    )
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # ================= IMAGE PREVIEW =================
 
@@ -251,23 +315,23 @@ if uploaded_file is not None:
 
     image = Image.open(uploaded_file)
 
-    st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+    with right:
 
-    st.markdown(
-        "<div class='section-title'>🖼 Uploaded Image Preview</div>",
-        unsafe_allow_html=True
-    )
+        st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 
-    st.image(
-        image,
-        caption="Uploaded Road Image",
-        use_container_width=True
-    )
+        st.markdown(
+            '<div class="section-title">🖼 Image Preview</div>',
+            unsafe_allow_html=True
+        )
 
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.image(
+            image,
+            use_container_width=True
+        )
 
-    # ================= FAKE PREDICTION =================
-    # Replace with actual CNN prediction later
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ================= PREDICTION =================
 
     probabilities = np.random.dirichlet(np.ones(3), size=1)[0]
 
@@ -291,78 +355,140 @@ if uploaded_file is not None:
         severity = "Low"
         sev_color = "#22c55e"
 
-    # ================= PREDICTION AREA =================
+    # ================= PREDICTION CARD =================
 
-    st.markdown("<div class='prediction-box'>", unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="prediction-card">
+
+        <div class="metric-big">
+            🚨 {pred_label} Detected
+        </div>
+
+        <div class="metric">
+            Confidence Score
+        </div>
+
+        <h1 style="font-size:55px;">
+            {confidence:.2f}%
+        </h1>
+
+        <div class="metric">
+            Severity Level
+        </div>
+
+        <h2 style="color:{sev_color}; font-size:34px;">
+            {severity}
+        </h2>
+
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ================= CHART SECTION =================
+
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 
     st.markdown(
-        f"""
-        <h2>🚨 {pred_label} Detected</h2>
-        <h3>Confidence: {confidence:.2f}%</h3>
-        <h3 style='color:{sev_color};'>Severity: {severity}</h3>
-        """,
+        '<div class="section-title">📊 Confidence Visualization</div>',
         unsafe_allow_html=True
     )
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # ================= VISUALIZATION =================
-
-    st.markdown("<div class='section-box'>", unsafe_allow_html=True)
-
-    st.markdown(
-        "<div class='section-title'>📊 Class Confidence Graph</div>",
-        unsafe_allow_html=True
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=classes,
+                y=probabilities,
+                text=[f"{p*100:.1f}%" for p in probabilities],
+                textposition='auto'
+            )
+        ]
     )
 
-    fig, ax = plt.subplots(figsize=(7,4))
+    fig.update_layout(
+        height=450,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', size=14),
+        xaxis_title="Damage Type",
+        yaxis_title="Confidence",
+        yaxis=dict(range=[0,1])
+    )
 
-    bars = ax.bar(classes, probabilities)
+    st.plotly_chart(fig, use_container_width=True)
 
-    for bar in bars:
-        bar.set_alpha(0.8)
-
-    ax.set_ylabel("Confidence")
-
-    ax.set_ylim([0,1])
-
-    ax.grid(alpha=0.3)
-
-    st.pyplot(fig)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # ================= RECOMMENDATIONS =================
 
-    st.markdown("<div class='recommend-box'>", unsafe_allow_html=True)
+    st.markdown('<div class="recommend-card">', unsafe_allow_html=True)
 
-    st.markdown(
-        "<h2>⚠ Recommendations</h2>",
-        unsafe_allow_html=True
-    )
+    st.markdown("""
+    <h1 style="color:white;">
+    ⚠ Maintenance Recommendations
+    </h1>
+    """, unsafe_allow_html=True)
 
     if severity == "High":
 
         st.markdown("""
-        - Immediate maintenance recommended.<br>
-        - High-risk road condition detected.<br>
-        - Authorities should prioritize repair work.
+        <div class="normal-text">
+
+        🔴 Immediate maintenance required.<br><br>
+
+        🔴 Severe road damage detected.<br><br>
+
+        🔴 Authorities should prioritize repair work urgently.<br><br>
+
+        🔴 High probability of accidents and vehicle damage.
+
+        </div>
         """, unsafe_allow_html=True)
 
     elif severity == "Medium":
 
         st.markdown("""
-        - Schedule maintenance soon.<br>
-        - Moderate road damage detected.<br>
-        - Regular monitoring recommended.
+        <div class="normal-text">
+
+        🟠 Moderate road damage identified.<br><br>
+
+        🟠 Schedule maintenance soon.<br><br>
+
+        🟠 Continuous monitoring is recommended.<br><br>
+
+        🟠 Repair can prevent future worsening.
+
+        </div>
         """, unsafe_allow_html=True)
 
     else:
 
         st.markdown("""
-        - Minor road issue detected.<br>
-        - Continue periodic inspections.<br>
-        - Low immediate safety risk.
+        <div class="normal-text">
+
+        🟢 Minor road damage detected.<br><br>
+
+        🟢 Continue periodic inspections.<br><br>
+
+        🟢 Low immediate safety risk.<br><br>
+
+        🟢 Preventive maintenance recommended.
+
+        </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+else:
+
+    st.markdown("""
+    <div class="glass-card" style="text-align:center;">
+
+        <h1 style="font-size:38px;">
+        🚀 Upload a road image to begin AI analysis
+        </h1>
+
+        <p style="font-size:20px; color:#cbd5e1;">
+        The system will automatically detect potholes, cracks, and manholes.
+        </p>
+
+    </div>
+    """, unsafe_allow_html=True)
